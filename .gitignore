@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+coords_captured.json
+processed_orders.json
+automation.log
+.env
+*.local

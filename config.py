@@ -23,9 +23,17 @@ PROCESSED_ORDERS_FILE = PROJECT_ROOT / "processed_orders.json"
 # --- Shopify Admin API ---
 # Shop domain without https, e.g. "my-store" or "my-store.myshopify.com"
 SHOPIFY_SHOP = os.environ.get("SHOPIFY_SHOP", "aracacao.myshopify.com")
+SHOPIFY_CLIENT_ID = os.environ.get(
+    "SHOPIFY_CLIENT_ID",
+    "587464d1433b2564ea73607f39f226a6",
+)
+SHOPIFY_CLIENT_SECRET = os.environ.get(
+    "SHOPIFY_CLIENT_SECRET",
+    "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",
+)
 SHOPIFY_ACCESS_TOKEN = os.environ.get(
     "SHOPIFY_ACCESS_TOKEN",
-    "",
+    "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",
 )
 # API version segment in URL path
 SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2024-01")

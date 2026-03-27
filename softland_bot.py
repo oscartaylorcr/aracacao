@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -14,18 +15,41 @@ from typing import Any
 import pyautogui
 import pygetwindow as gw
 
-from config import (
-    COORDS_FILE,
-    DELAYS,
-    PYAUTOGUI_FAILSAFE,
-    SKU_MAP,
-    SOFTLAND_EXE_PATH,
-    SOFTLAND_PASSWORD,
-    SOFTLAND_USER,
-    SOFTLAND_WINDOW_TITLE_SUBSTRING,
-)
+import config as app_config
 
 logger = logging.getLogger(__name__)
+
+COORDS_FILE = app_config.COORDS_FILE
+PYAUTOGUI_FAILSAFE = app_config.PYAUTOGUI_FAILSAFE
+SKU_MAP = app_config.SKU_MAP
+SOFTLAND_EXE_PATH = app_config.SOFTLAND_EXE_PATH
+SOFTLAND_PASSWORD = app_config.SOFTLAND_PASSWORD
+SOFTLAND_USER = app_config.SOFTLAND_USER
+SOFTLAND_WINDOW_TITLE_SUBSTRING = app_config.SOFTLAND_WINDOW_TITLE_SUBSTRING
+WINDOWS_APP_EXE_PATH = getattr(
+    app_config,
+    "WINDOWS_APP_EXE_PATH",
+    os.environ.get(
+        "WINDOWS_APP_EXE_PATH",
+        r"C:\Program Files\WindowsApps\MicrosoftCorporationII.WindowsApp_...\Windows App.exe",
+    ),
+)
+WINDOWS_APP_WINDOW_TITLE_SUBSTRING = getattr(
+    app_config,
+    "WINDOWS_APP_WINDOW_TITLE_SUBSTRING",
+    os.environ.get("WINDOWS_APP_WINDOW_TITLE_SUBSTRING", "Windows App"),
+)
+DELAYS = {
+    "after_launch": 12.0,
+    "after_windows_app_launch": 8.0,
+    "after_portal_launch": 10.0,
+    "after_erp_launch": 8.0,
+    "between_keys": 0.05,
+    "between_clicks": 0.4,
+    "after_tab": 0.2,
+    "after_invoice_save": 2.0,
+}
+DELAYS.update(getattr(app_config, "DELAYS", {}))
 
 pyautogui.FAILSAFE = PYAUTOGUI_FAILSAFE
 pyautogui.PAUSE = DELAYS["between_clicks"]
@@ -66,18 +90,14 @@ def _type_clipboard(text: str) -> None:
     time.sleep(DELAYS["after_tab"])
 
 
-def focus_softland_window() -> None:
-    title = SOFTLAND_WINDOW_TITLE_SUBSTRING
+def _focus_window(title: str, missing_message: str) -> None:
     wins = gw.getWindowsWithTitle(title)
     if not wins:
         # try contains
         all_w = gw.getAllWindows()
         wins = [w for w in all_w if title.lower() in (w.title or "").lower()]
     if not wins:
-        raise RuntimeError(
-            f"No window found matching title containing '{title}'. "
-            "Set SOFTLAND_WINDOW_TITLE_SUBSTRING in config.py."
-        )
+        raise RuntimeError(missing_message)
     w = wins[0]
     try:
         w.activate()
@@ -87,18 +107,42 @@ def focus_softland_window() -> None:
     time.sleep(0.5)
 
 
-def launch_softland_if_needed() -> None:
+def focus_softland_window() -> None:
+    _focus_window(
+        SOFTLAND_WINDOW_TITLE_SUBSTRING,
+        f"No window found matching title containing '{SOFTLAND_WINDOW_TITLE_SUBSTRING}'. "
+        "Set SOFTLAND_WINDOW_TITLE_SUBSTRING in config.py.",
+    )
+
+
+def focus_windows_app_window() -> None:
+    _focus_window(
+        WINDOWS_APP_WINDOW_TITLE_SUBSTRING,
+        f"No window found matching title containing '{WINDOWS_APP_WINDOW_TITLE_SUBSTRING}'. "
+        "Set WINDOWS_APP_WINDOW_TITLE_SUBSTRING in config.py.",
+    )
+
+
+def launch_local_softland_if_needed() -> bool:
     exe = Path(SOFTLAND_EXE_PATH)
     if not exe.is_file():
-        logger.warning(
-            "SOFTLAND_EXE_PATH does not exist: %s — assuming Softland is already open.",
-            exe,
-        )
-        return
+        return False
     logger.info("Launching Softland: %s", exe)
     subprocess.Popen([str(exe)], shell=False)
     time.sleep(DELAYS["after_launch"])
     focus_softland_window()
+    return True
+
+
+def launch_windows_app_if_needed() -> bool:
+    exe = Path(WINDOWS_APP_EXE_PATH)
+    if not exe.is_file():
+        return False
+    logger.info("Launching Windows App: %s", exe)
+    subprocess.Popen([str(exe)], shell=False)
+    time.sleep(DELAYS["after_windows_app_launch"])
+    focus_windows_app_window()
+    return True
 
 
 def map_sku(shopify_sku: str) -> str:
@@ -120,19 +164,73 @@ def login_if_configured(coords: dict[str, list[int]]) -> None:
         _click(coords, "login_ok_xy")
     else:
         pyautogui.press("enter")
-    time.sleep(DELAYS["after_launch"])
+    time.sleep(DELAYS["after_erp_launch"])
+
+
+def open_softland_via_windows_app(coords: dict[str, list[int]]) -> None:
+    """
+    Optional bootstrap flow for remote Softland access:
+    Windows App -> Aplicaciones -> Softland Cloud -> Programas -> Softland ERP
+    """
+    used_windows_app_flow = any(
+        key in coords
+        for key in (
+            "windows_app_apps_xy",
+            "windows_app_softland_cloud_xy",
+            "portal_programas_xy",
+            "portal_softland_erp_xy",
+        )
+    )
+    if not used_windows_app_flow:
+        return
+
+    windows_app_started = launch_windows_app_if_needed()
+    if windows_app_started or "windows_app_apps_xy" in coords:
+        focus_windows_app_window()
+
+    if "windows_app_apps_xy" in coords:
+        _click(coords, "windows_app_apps_xy")
+        time.sleep(DELAYS["after_tab"])
+
+    if "windows_app_softland_cloud_xy" in coords:
+        _click(coords, "windows_app_softland_cloud_xy")
+        time.sleep(DELAYS["after_portal_launch"])
+
+    focus_softland_window()
+
+    if "portal_programas_xy" in coords:
+        _click(coords, "portal_programas_xy")
+        time.sleep(DELAYS["after_tab"])
+
+    if "portal_softland_erp_xy" in coords:
+        _click(coords, "portal_softland_erp_xy")
+        time.sleep(DELAYS["after_erp_launch"])
+
+    focus_softland_window()
+
+
+def navigate_to_facturacion_if_configured(coords: dict[str, list[int]]) -> None:
+    if "menu_facturacion_xy" not in coords:
+        logger.info("No menu_facturacion_xy in coords; assuming Facturacion is already open.")
+        return
+    focus_softland_window()
+    _click(coords, "menu_facturacion_xy")
+    time.sleep(DELAYS["after_tab"])
 
 
 _coords_cache: dict[str, list[int]] | None = None
 
 
 def initialize_session() -> dict[str, list[int]]:
-    """Launch Softland, focus window, login if coords provided. Returns coords dict."""
+    """Open Softland session, optionally via Windows App / portal, and navigate to Facturacion."""
     global _coords_cache
     _coords_cache = load_coords()
-    launch_softland_if_needed()
+    launched_locally = launch_local_softland_if_needed()
+    if not launched_locally:
+        open_softland_via_windows_app(_coords_cache)
     focus_softland_window()
     login_if_configured(_coords_cache)
+    navigate_to_facturacion_if_configured(_coords_cache)
     return _coords_cache
 
 

@@ -19,9 +19,14 @@ pyautogui.FAILSAFE = PYAUTOGUI_FAILSAFE
 # Keys used by softland_bot.py — calibrate the ones you need; you can skip optional keys
 # by editing the JSON afterward or pressing Enter without moving (not recommended).
 CALIBRATION_STEPS: list[tuple[str, str]] = [
+    ("windows_app_apps_xy", "Windows App: Aplicaciones tab/button (skip if you open it manually)"),
+    ("windows_app_softland_cloud_xy", "Windows App: Softland Cloud / Portal Cloud shortcut"),
+    ("portal_programas_xy", "Softland Cloud: Programas option"),
+    ("portal_softland_erp_xy", "Softland Cloud: Softland ERP option"),
     ("login_user_xy", "Login: click field for USERNAME (skip if already logged in — press Enter at center of screen)"),
     ("login_pass_xy", "Login: PASSWORD field"),
     ("login_ok_xy", "Login: OK / Entrar button"),
+    ("menu_facturacion_xy", "Softland ERP: menu option to navigate to Facturacion"),
     ("menu_new_invoice_xy", "Facturación: menu or button to create NEW invoice (optional if you use toolbar)"),
     ("toolbar_new_invoice_xy", "Toolbar shortcut for new invoice (optional)"),
     ("invoice_customer_xy", "Invoice header: CUSTOMER / cliente field"),
@@ -66,7 +71,10 @@ def main() -> None:
     with open(COORDS_FILE, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
     print(f"\nWrote {len(out)} coordinates to {COORDS_FILE}")
-    print("Next: set SOFTLAND_WINDOW_TITLE_SUBSTRING and test with: python main.py --dry-run then python main.py")
+    print(
+        "Next: set SOFTLAND_WINDOW_TITLE_SUBSTRING (and optionally WINDOWS_APP_WINDOW_TITLE_SUBSTRING), "
+        "then test with: python main.py --dry-run and python main.py"
+    )
 
 
 if __name__ == "__main__":
